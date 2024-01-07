@@ -8,6 +8,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type Post struct {
+	UserID int    `json:"userId"`
+	ID     int    `json:"id"`
+	Title  string `json:"title"`
+	Body   string `json:"body"`
+}
+
 var db = make(map[string]string)
 
 func setupRouter() *gin.Engine {
@@ -33,33 +40,14 @@ func setupRouter() *gin.Engine {
 	})
 
 	r.GET("/posts", func(c *gin.Context) {
-		type Post struct {
-			UserID int    `json:"userId"`
-			ID     int    `json:"id"`
-			Title  string `json:"title"`
-			Body   string `json:"body"`
-		}
-
-		apiURL := "https://jsonplaceholder.typicode.com/posts"
-		response, err := http.Get(apiURL)
-		if err != nil {
+		posts := makeAPIRequest()
+		if posts == nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error making the request"})
 			return
 		}
-		defer response.Body.Close()
-		if response.StatusCode != http.StatusOK {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Unexpected status code: %s", response.Status)})
-			return
-		}
+		modifyPost := posts[0:5]
 
-		var posts []Post
-		err = json.NewDecoder(response.Body).Decode(&posts)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error decoding JSON"})
-			return
-		}
-
-		c.JSON(http.StatusOK, posts)
+		c.JSON(http.StatusOK, modifyPost)
 	})
 
 	r.POST("test", func(ctx *gin.Context) {
@@ -70,26 +58,11 @@ func setupRouter() *gin.Engine {
 
 		var form User
 
-		// body, err := ioutil.ReadAll(ctx.Request.Body)
-
-		// var form User
-
-		// if err != nil {
-		// 	ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Error reading request body"})
-		// 	return
-		// }
-
-		// bodyString := string(body)
-		// fmt.Println("Received POST request with body:", bodyString)
-		// ctx.JSON(http.StatusOK, gin.H{"user": form.name, "password": form.password})
-
-		if err := ctx.ShouldBind(&form); err == nil {
+		err := ctx.ShouldBind(&form)
+		if err == nil {
 			fmt.Println(form.Name)
 			fmt.Println(form.Password)
-			ctx.JSON(http.StatusOK, gin.H{
-				"name":     form.Name,
-				"password": form.Password,
-			})
+			ctx.JSON(http.StatusOK, form)
 		} else {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		}
@@ -142,4 +115,27 @@ func main() {
 	r := setupRouter()
 	// Listen and Server in 0.0.0.0:8080
 	r.Run(":8080")
+}
+
+func makeAPIRequest() []Post {
+	apiURL := "https://jsonplaceholder.typicode.com/posts"
+	response, err := http.Get(apiURL)
+	if err != nil {
+		// c.JSON(http.StatusInternalServerError, gin.H{"error": "Error making the request"})
+		return nil
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		// c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Unexpected status code: %s", response.Status)})
+		return nil
+	}
+
+	var posts []Post
+	err = json.NewDecoder(response.Body).Decode(&posts)
+	if err != nil {
+		// c.JSON(http.StatusInternalServerError, gin.H{"error": "Error decoding JSON"})
+		return nil
+	}
+
+	return posts
 }
